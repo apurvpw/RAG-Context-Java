@@ -218,13 +218,3 @@ This application leverages LangChain4j, a Java framework for building LLM applic
 - **LLM Integration**: Communicating with the language model using LangChain4j's unified API
 
 The application demonstrates how to build a production-grade RAG application using LangChain4j's components in a Spring Boot environment.
-
-## Recent Changes
-
-- Added MongoDB storage for chat questions and answers
-- Implemented session management UI with context and session selection
-- Added ability to view and resume previous chat sessions
-- Implemented session naming and renaming functionality
-- Added chat history loading when resuming a session
-- Removed duplicate UI tabs to improve user experience
-- Simplified architecture by removing DocumentController and Service, as context creation with embeddings handles document uploading 
