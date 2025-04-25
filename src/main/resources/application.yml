@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: rag-context
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: rag-context
+      username: admin
+      password: zeus123
+      authentication-database: admin
+      auto-index-creation: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+      enabled: true
+
+app:
+  chroma:
+    url: http://localhost:8000
+  ollama:
+    url: http://localhost:11434
+    chat-model: llama3.2
+    embedding-model: llama3.2
+  embedding:
+    dimensions: 384  # Embedding dimensions based on the model used
+  document:
+    chunk-size: 512
+    chunk-overlap: 50
+  websocket:
+    endpoint: /ws
+    destination-prefix: /topic

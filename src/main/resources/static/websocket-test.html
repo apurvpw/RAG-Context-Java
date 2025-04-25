@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Chat Client</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+        .message-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .input-container {
+            display: flex;
+        }
+        #message {
+            flex: 1;
+            padding: 8px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .connection-status {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>RAG Context WebSocket Chat</h1>
+    
+    <div class="connection-status disconnected" id="status">
+        Disconnected
+    </div>
+    
+    <div class="form-group">
+        <label for="sessionId">Session ID:</label>
+        <input type="text" id="sessionId" placeholder="Enter your session ID">
+    </div>
+    
+    <div class="form-group">
+        <label for="contextId">Context ID:</label>
+        <input type="text" id="contextId" placeholder="Enter context ID">
+    </div>
+    
+    <div class="form-group">
+        <label for="contextName">Context Name:</label>
+        <input type="text" id="contextName" placeholder="Enter context name">
+    </div>
+    
+    <button id="connect" onclick="connect()">Connect</button>
+    <button id="disconnect" onclick="disconnect()" disabled>Disconnect</button>
+    
+    <div class="chat-container">
+        <div class="message-container" id="conversation"></div>
+        <div class="input-container">
+            <input type="text" id="message" placeholder="Type your question here...">
+            <button id="send" onclick="sendMessage()" disabled>Send</button>
+        </div>
+    </div>
+    
+    <script>
+        var stompClient = null;
+        var responseText = "";
+        
+        function setConnected(connected) {
+            document.getElementById('connect').disabled = connected;
+            document.getElementById('disconnect').disabled = !connected;
+            document.getElementById('send').disabled = !connected;
+            
+            var status = document.getElementById('status');
+            if (connected) {
+                status.className = 'connection-status connected';
+                status.innerHTML = 'Connected';
+            } else {
+                status.className = 'connection-status disconnected';
+                status.innerHTML = 'Disconnected';
+            }
+        }
+        
+        function connect() {
+            var sessionId = document.getElementById('sessionId').value;
+            if (!sessionId) {
+                alert("Please enter a session ID");
+                return;
+            }
+            
+            var socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function(frame) {
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                
+                // Subscribe to get messages back
+                stompClient.subscribe('/topic/chat/' + sessionId, function(response) {
+                    var respData = JSON.parse(response.body);
+                    handleResponse(respData);
+                });
+            }, function(error) {
+                console.log('Error: ' + error);
+                setConnected(false);
+                setTimeout(function() {
+                    connect();
+                }, 5000);
+            });
+        }
+        
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+            }
+            setConnected(false);
+            console.log("Disconnected");
+            responseText = "";
+        }
+        
+        function sendMessage() {
+            var sessionId = document.getElementById('sessionId').value;
+            var contextId = document.getElementById('contextId').value;
+            var contextName = document.getElementById('contextName').value;
+            var message = document.getElementById('message').value;
+            
+            if (!sessionId || !contextId || !contextName || !message) {
+                alert("Please fill all fields");
+                return;
+            }
+            
+            // Clear previous response
+            responseText = "";
+            
+            // Display question
+            var conversation = document.getElementById('conversation');
+            var userDiv = document.createElement('div');
+            userDiv.style.marginBottom = '10px';
+            userDiv.innerHTML = '<strong>You:</strong> ' + message;
+            conversation.appendChild(userDiv);
+            
+            // Prepare AI response area
+            var aiDiv = document.createElement('div');
+            aiDiv.id = 'current-response';
+            aiDiv.style.marginBottom = '20px';
+            aiDiv.innerHTML = '<strong>AI:</strong> <span id="ai-text"></span>';
+            conversation.appendChild(aiDiv);
+            
+            // Auto-scroll to bottom
+            conversation.scrollTop = conversation.scrollHeight;
+            
+            stompClient.send("/app/chat", {}, JSON.stringify({
+                'sessionId': sessionId,
+                'contextId': contextId, 
+                'contextName': contextName,
+                'question': message
+            }));
+            
+            document.getElementById('message').value = '';
+        }
+        
+        function handleResponse(response) {
+            var aiText = document.getElementById('ai-text');
+            
+            if (!response.done) {
+                // Append token to the response
+                responseText += response.message;
+                aiText.textContent = responseText;
+            } else {
+                // Mark response as complete
+                var currentResponse = document.getElementById('current-response');
+                currentResponse.removeAttribute('id');
+            }
+            
+            // Auto-scroll to bottom
+            var conversation = document.getElementById('conversation');
+            conversation.scrollTop = conversation.scrollHeight;
+        }
+    </script>
+</body>
+</html> 

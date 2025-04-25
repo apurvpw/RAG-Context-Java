@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RAG Context Manager</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        h2 {
+            color: #3498db;
+            margin-top: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #444;
+        }
+        input[type="text"], 
+        input[type="file"],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 15px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 5px solid #2ecc71;
+        }
+        .error {
+            border-left: 5px solid #e74c3c;
+            color: #e74c3c;
+        }
+        .hidden {
+            display: none;
+        }
+        .chat-section {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .context-info {
+            margin-bottom: 15px;
+        }
+        .context-id {
+            font-weight: bold;
+            color: #3498db;
+        }
+        #fileInfoDisplay {
+            margin-top: 10px;
+            color: #555;
+            font-style: italic;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .notification.success {
+            background-color: #2ecc71;
+        }
+        
+        .notification.error {
+            background-color: #e74c3c;
+        }
+        
+        .notification.info {
+            background-color: #3498db;
+        }
+        
+        .notification.show {
+            opacity: 1;
+        }
+        
+        .progress-bar {
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.5);
+            width: 100%;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            border-radius: 0 0 5px 5px;
+        }
+        
+        .progress-bar-inner {
+            height: 100%;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 0 0 5px 5px;
+            animation: progress 5s linear forwards;
+        }
+        
+        @keyframes progress {
+            0% { width: 100%; }
+            100% { width: 0%; }
+        }
+        
+        /* Tabs styling */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background-color: #f8f9fa;
+            color: #333;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .tab-button:hover {
+            background-color: #e9ecef;
+        }
+        
+        .tab-button.active {
+            background-color: #fff;
+            border-bottom: 2px solid #3498db;
+            color: #3498db;
+            font-weight: bold;
+        }
+        
+        /* Session history styling */
+        .session-history {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        
+        .session-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .session-item:hover {
+            background-color: #f5f8fa;
+            border-color: #3498db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .session-title {
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+        
+        .session-details {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .session-time {
+            font-size: 12px;
+            color: #999;
+            text-align: right;
+            margin-top: 5px;
+        }
+        
+        .no-sessions-message {
+            padding: 15px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        /* Session selection section */
+        .session-selection {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .dropdown-container {
+            margin-bottom: 15px;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        
+        .load-button {
+            background-color: #9b59b6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .load-button:hover {
+            background-color: #8e44ad;
+        }
+        
+        .load-button:disabled {
+            background-color: #d1d1d1;
+            cursor: not-allowed;
+        }
+        
+        .session-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        
+        .session-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .session-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .session-item.selected {
+            background-color: rgba(155, 89, 182, 0.1);
+            border-left: 3px solid #9b59b6;
+        }
+        
+        .session-name {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .session-date {
+            font-size: 0.8em;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <h1>RAG Context Manager</h1>
+    
+    <!-- Notification element -->
+    <div id="notification" class="notification">
+        <span id="notificationMessage"></span>
+        <div class="progress-bar">
+            <div class="progress-bar-inner"></div>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="tabs">
+        <button id="tabCreateContext" class="tab-button active">Create Context</button>
+        <button id="tabChatSessions" class="tab-button">Chat Sessions</button>
+    </div>
+    
+    <!-- Create Context Tab -->
+    <div id="createContextTab" class="card">
+        <h2>Create Context</h2>
+        <form id="embeddingForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="contextName">Context Name:</label>
+                <input type="text" id="contextName" name="contextName" required 
+                       placeholder="Enter a name for this context">
+            </div>
+            
+            <div class="form-group">
+                <label for="contextDescription">Context Description:</label>
+                <textarea id="contextDescription" name="contextDescription" 
+                          placeholder="Enter a description for this context"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="document">Upload Document:</label>
+                <input type="file" id="document" name="document" onChange="updateFileInfo()">
+                <div id="fileInfoDisplay"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="documentUrl">OR Document URL (optional):</label>
+                <input type="text" id="documentUrl" name="documentUrl" 
+                       placeholder="Enter a URL to a document">
+            </div>
+            
+            <button type="submit" id="createButton">Create Embeddings</button>
+        </form>
+        
+        <div id="loadingSection" class="loading">
+            <div class="spinner"></div>
+            <p>Creating embeddings and processing document. This may take a few moments...</p>
+        </div>
+        
+        <div id="resultSection" class="result">
+            <h3>Context Created Successfully!</h3>
+            <div class="context-info">
+                <p>Context ID: <span id="contextIdDisplay" class="context-id"></span></p>
+                <p>Context Name: <span id="contextNameDisplay"></span></p>
+            </div>
+            <button id="startChatButton">Start New Chat Session</button>
+        </div>
+        
+        <div id="errorSection" class="result error hidden">
+            <h3>Error Occurred</h3>
+            <p id="errorMessage"></p>
+        </div>
+    </div>
+    
+    <!-- Chat Sessions Tab -->
+    <div id="chatSessionsTab" class="card hidden">
+        <h2>Chat Sessions</h2>
+        
+        <div class="session-selection">
+            <div class="form-group">
+                <label for="contextDropdown">Select Context:</label>
+                <select id="contextDropdown">
+                    <option value="">Loading contexts...</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="sessionDropdownContainer" style="display: none;">
+                <label for="sessionDropdown">Select Session:</label>
+                <select id="sessionDropdown">
+                    <option value="">Select a context first</option>
+                </select>
+            </div>
+            
+            <button id="loadSessionButton" class="load-button" disabled>Load Selected Session</button>
+        </div>
+    </div>
+    
+    <script>
+        // Show notification
+        function showNotification(message, type = 'info', duration = 5000) {
+            const notification = document.getElementById('notification');
+            const notificationMessage = document.getElementById('notificationMessage');
+            
+            // Set message and type
+            notificationMessage.textContent = message;
+            notification.className = 'notification ' + type;
+            
+            // Show notification
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            // Hide notification after duration
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, duration);
+        }
+        
+        // Check upload limits and validate file
+        function validateFile(file) {
+            // Check file size (max 50MB as configured in application.yml)
+            const maxSize = 50 * 1024 * 1024; // 50MB
+            if (file.size > maxSize) {
+                showNotification('File is too large. Maximum size is 50MB.', 'error');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Update file information when a file is selected
+        function updateFileInfo() {
+            const fileInput = document.getElementById('document');
+            const fileInfoDisplay = document.getElementById('fileInfoDisplay');
+            
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                if (!validateFile(file)) {
+                    fileInput.value = ''; // Clear the file input
+                    fileInfoDisplay.textContent = '';
+                    return;
+                }
+                
+                const fileSize = formatFileSize(file.size);
+                fileInfoDisplay.textContent = `Selected file: ${file.name} (${fileSize})`;
+            } else {
+                fileInfoDisplay.textContent = '';
+            }
+        }
+        
+        // Format file size in KB or MB
+        function formatFileSize(bytes) {
+            if (bytes < 1024) {
+                return bytes + ' B';
+            } else if (bytes < 1048576) {
+                return (bytes / 1024).toFixed(2) + ' KB';
+            } else {
+                return (bytes / 1048576).toFixed(2) + ' MB';
+            }
+        }
+        
+        // Handle form submission
+        document.getElementById('embeddingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Get form data
+            const formData = new FormData(this);
+            const createButton = document.getElementById('createButton');
+            const loadingSection = document.getElementById('loadingSection');
+            const resultSection = document.getElementById('resultSection');
+            const errorSection = document.getElementById('errorSection');
+            
+            // Validate form - at least a file or URL should be provided
+            if (!formData.get('document').size && !formData.get('documentUrl')) {
+                document.getElementById('errorMessage').textContent = 'Please provide either a document file or URL';
+                errorSection.classList.remove('hidden');
+                showNotification('Please provide either a document file or URL', 'error');
+                return;
+            }
+            
+            // Show loading, hide results and errors
+            createButton.disabled = true;
+            loadingSection.style.display = 'block';
+            resultSection.style.display = 'none';
+            errorSection.classList.add('hidden');
+            
+            // Show notification
+            showNotification('Creating context and processing document...', 'info');
+            
+            try {
+                // Send the request to create embeddings
+                const response = await fetch('/api/create-context-embeddings', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    // Display context information
+                    document.getElementById('contextIdDisplay').textContent = result.id;
+                    document.getElementById('contextNameDisplay').textContent = result.name;
+                    
+                    // Show result section
+                    resultSection.style.display = 'block';
+                    
+                    // Show success notification
+                    showNotification('Context created successfully!', 'success');
+                } else {
+                    // Handle error
+                    const errorData = await response.text();
+                    document.getElementById('errorMessage').textContent = 
+                        `Error: ${response.status} - ${errorData}`;
+                    errorSection.classList.remove('hidden');
+                    
+                    // Show error notification
+                    showNotification(`Error: ${response.status} - ${errorData}`, 'error');
+                }
+            } catch (error) {
+                // Handle exception
+                document.getElementById('errorMessage').textContent = 
+                    `An error occurred: ${error.message}`;
+                errorSection.classList.remove('hidden');
+                
+                // Show error notification
+                showNotification(`An error occurred: ${error.message}`, 'error');
+            } finally {
+                // Hide loading, enable button
+                loadingSection.style.display = 'none';
+                createButton.disabled = false;
+            }
+        });
+        
+        // Tab switching
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab elements
+            const tabCreateContext = document.getElementById('tabCreateContext');
+            const tabChatSessions = document.getElementById('tabChatSessions');
+            
+            const createContextTab = document.getElementById('createContextTab');
+            const chatSessionsTab = document.getElementById('chatSessionsTab');
+            
+            // Tab switching
+            tabCreateContext.addEventListener('click', function() {
+                setActiveTab(tabCreateContext, createContextTab);
+            });
+            
+            tabChatSessions.addEventListener('click', function() {
+                setActiveTab(tabChatSessions, chatSessionsTab);
+                loadContexts();
+            });
+            
+            function setActiveTab(activeTabButton, activeTabContent) {
+                // Update button classes
+                [tabCreateContext, tabChatSessions].forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                activeTabButton.classList.add('active');
+                
+                // Update content display
+                [createContextTab, chatSessionsTab].forEach(content => {
+                    content.classList.add('hidden');
+                });
+                activeTabContent.classList.remove('hidden');
+            }
+            
+            // Session management
+            const contextDropdown = document.getElementById('contextDropdown');
+            const sessionDropdown = document.getElementById('sessionDropdown');
+            const sessionDropdownContainer = document.getElementById('sessionDropdownContainer');
+            const loadSessionButton = document.getElementById('loadSessionButton');
+            
+            // Load contexts
+            function loadContexts() {
+                fetch('/api/contexts')
+                    .then(response => response.json())
+                    .then(contexts => {
+                        contextDropdown.innerHTML = '<option value="">Select a context</option>';
+                        contexts.forEach(context => {
+                            const option = document.createElement('option');
+                            option.value = context.id;
+                            option.textContent = context.name;
+                            contextDropdown.appendChild(option);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error loading contexts:', error);
+                        showNotification('Failed to load contexts', 'error');
+                    });
+            }
+            
+            // When context is selected, load sessions
+            contextDropdown.addEventListener('change', function() {
+                const contextId = this.value;
+                if (!contextId) {
+                    sessionDropdownContainer.style.display = 'none';
+                    loadSessionButton.disabled = true;
+                    return;
+                }
+                
+                loadSessionsForContext(contextId);
+            });
+            
+            function loadSessionsForContext(contextId) {
+                fetch(`/api/contexts/${contextId}/sessions`)
+                    .then(response => response.json())
+                    .then(sessions => {
+                        sessionDropdown.innerHTML = '<option value="">Select a session</option>';
+                        sessions.forEach(session => {
+                            const option = document.createElement('option');
+                            option.value = session.id;
+                            
+                            // Format the display name with creation date
+                            const date = new Date(session.createdAt);
+                            const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                            const displayName = session.sessionName || 'Session ' + formattedDate;
+                            
+                            option.textContent = displayName;
+                            sessionDropdown.appendChild(option);
+                        });
+                        
+                        sessionDropdownContainer.style.display = 'block';
+                    })
+                    .catch(error => {
+                        console.error('Error loading sessions:', error);
+                        showNotification('Failed to load sessions', 'error');
+                    });
+            }
+            
+            // When session is selected
+            sessionDropdown.addEventListener('change', function() {
+                loadSessionButton.disabled = !this.value;
+            });
+            
+            // Load session button
+            loadSessionButton.addEventListener('click', function() {
+                const contextId = contextDropdown.value;
+                const contextName = contextDropdown.options[contextDropdown.selectedIndex].text;
+                const sessionId = sessionDropdown.value;
+                
+                if (contextId && sessionId) {
+                    window.location.href = `chat.html?sessionId=${sessionId}&contextId=${contextId}&contextName=${encodeURIComponent(contextName)}`;
+                }
+            });
+        });
+        
+        // Save session info when starting a new chat
+        document.getElementById('startChatButton').addEventListener('click', async function() {
+            const contextId = document.getElementById('contextIdDisplay').textContent;
+            const contextName = document.getElementById('contextNameDisplay').textContent;
+            
+            // Show notification
+            showNotification('Creating chat session...', 'info');
+            
+            try {
+                // Create a chat session
+                const response = await fetch('/api/create-chat-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contextId: contextId,
+                        contextName: contextName
+                    })
+                });
+                
+                if (response.ok) {
+                    const chatSession = await response.json();
+                    
+                    // Save session to history
+                    saveSessionToHistory(chatSession.id, contextId, contextName);
+                    
+                    // Show success notification
+                    showNotification('Chat session created, redirecting...', 'success');
+                    
+                    // Redirect to chat page with session info
+                    setTimeout(() => {
+                        window.location.href = `/chat.html?sessionId=${chatSession.id}&contextId=${contextId}&contextName=${encodeURIComponent(contextName)}`;
+                    }, 1000);
+                } else {
+                    const errorData = await response.text();
+                    alert(`Failed to create chat session: ${errorData}`);
+                    
+                    // Show error notification
+                    showNotification(`Failed to create chat session: ${errorData}`, 'error');
+                }
+            } catch (error) {
+                alert(`An error occurred: ${error.message}`);
+                
+                // Show error notification
+                showNotification(`An error occurred: ${error.message}`, 'error');
+            }
+        });
+        
+        // Session history management
+        function saveSessionToHistory(sessionId, contextId, contextName) {
+            // Get existing history from local storage
+            let sessionHistory = JSON.parse(localStorage.getItem('chatSessionHistory') || '[]');
+            
+            // Check if this session already exists
+            const existingIndex = sessionHistory.findIndex(s => s.sessionId === sessionId);
+            
+            // Create session object with timestamp
+            const sessionObj = {
+                sessionId: sessionId,
+                contextId: contextId,
+                contextName: contextName,
+                timestamp: new Date().toISOString()
+            };
+            
+            // If session exists, update it, otherwise add it
+            if (existingIndex >= 0) {
+                sessionHistory[existingIndex] = sessionObj;
+            } else {
+                // Add to beginning of array
+                sessionHistory.unshift(sessionObj);
+            }
+            
+            // Limit history to 10 items
+            sessionHistory = sessionHistory.slice(0, 10);
+            
+            // Save back to local storage
+            localStorage.setItem('chatSessionHistory', JSON.stringify(sessionHistory));
+        }
+    </script>
+</body>
+</html> 
