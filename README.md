@@ -5,7 +5,7 @@ This project implements a Retrieval Augmented Generation (RAG) system with conte
 ## Features
 
 - Context management for organizing documents
-- Document upload and processing
+- Document upload and processing via context creation
 - Integration with LangChain4j for LLM interactions and embedding generation
 - Embedding generation using the Ollama API
 - Embedding storage in ChromaDB
@@ -51,24 +51,18 @@ This project implements a Retrieval Augmented Generation (RAG) system with conte
 5. You can clear the chat window using the "Clear Chat" button
 6. Use "Back to Context Manager" to return to the main interface
 
-## Document Upload
+## Document Upload and Create Document Embeddings
 
 ### Using the API
 
-You can upload documents using the HTTP API directly:
+You can upload documents and create emebedddings using the HTTP API directly:
 
 ```bash
-# Create a context
-curl -X POST "http://localhost:8080/api/create-context" \
-    -H "Content-Type: application/json" \
-    -d '{"name":"My Context","description":"My description"}'
-
-# Upload a document
-curl -X POST "http://localhost:8080/api/documents" \
-    -F "contextId=YOUR_CONTEXT_ID" \
-    -F "contextName=YOUR_CONTEXT_NAME" \
-    -F "documentId=YOUR_DOCUMENT_ID" \
-    -F "file=@/path/to/your/file.pdf"
+# Create a context with embeddings
+curl -X POST "http://localhost:8080/api/create-context-embeddings" \
+    -F "contextName=My Context" \
+    -F "contextDescription=My description" \
+    -F "document=@/path/to/your/file.pdf"
 ```
 
 ## Supported Document Types
@@ -117,19 +111,6 @@ contextName: <context-name>
 contextDescription: <context-description>
 document: <file-upload> (Optional)
 documentUrl: <url> (Optional)
-```
-
-### Upload Document
-
-```
-POST /api/documents
-Content-Type: multipart/form-data
-
-contextName: <context-name>
-contextDescription: <context-description> (Optional)
-contextId: <context-id> (Optional, will be created if not provided)
-documentId: <document-id> (Optional, will be generated if not provided)
-file: <file-upload>
 ```
 
 ### Chat Sessions
@@ -245,4 +226,5 @@ The application demonstrates how to build a production-grade RAG application usi
 - Added ability to view and resume previous chat sessions
 - Implemented session naming and renaming functionality
 - Added chat history loading when resuming a session
-- Removed duplicate UI tabs to improve user experience 
+- Removed duplicate UI tabs to improve user experience
+- Simplified architecture by removing DocumentController and Service, as context creation with embeddings handles document uploading 

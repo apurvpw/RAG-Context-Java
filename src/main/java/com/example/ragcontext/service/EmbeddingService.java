@@ -2,14 +2,12 @@ package com.example.ragcontext.service;
 
 import com.example.ragcontext.config.AppProperties;
 import com.example.ragcontext.dto.EmbeddingRequest;
-import com.example.ragcontext.model.Context;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
-import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -26,8 +24,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -37,7 +33,6 @@ public class EmbeddingService {
 
     private final ContextService contextService;
     private final EmbeddingModel embeddingModel;
-    private final ChromaEmbeddingStore chromaEmbeddingStore;
     private final AppProperties appProperties;
 
     @SneakyThrows
@@ -45,7 +40,7 @@ public class EmbeddingService {
         log.info("Creating embeddings for context: {}", request.getContextId());
         
         // Verify the context exists
-        Context context = contextService.getContextById(request.getContextId());
+        contextService.getContextById(request.getContextId());
         
         String text;
         
@@ -90,14 +85,14 @@ public class EmbeddingService {
     
     private String extractTextFromPdf(byte[] pdfBytes) throws IOException {
         try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            return stripper.getText(document);
+            PDFTextStripper textStripper = new PDFTextStripper();
+            return textStripper.getText(document);
         }
     }
     
     private String extractTextFromWord(byte[] wordBytes) throws IOException {
-        try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(wordBytes))) {
-            XWPFWordExtractor extractor = new XWPFWordExtractor(document);
+        try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(wordBytes));
+             XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
             return extractor.getText();
         }
     }

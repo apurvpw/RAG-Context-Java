@@ -2,11 +2,7 @@ package com.example.ragcontext.service;
 
 import com.example.ragcontext.dto.ChatRequest;
 import com.example.ragcontext.dto.ChatResponse;
-import com.example.ragcontext.model.ChatSession;
 import com.example.ragcontext.model.Context;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +15,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +38,7 @@ public class ChatService {
         log.info("Processing chat request for session: {}", request.getSessionId());
         
         // Verify the session exists
-        ChatSession session = chatSessionService.getSessionById(request.getSessionId());
+        chatSessionService.getSessionById(request.getSessionId());
         
         // If contextId is not provided but contextName is, find the context by name
         // or create a new one if it doesn't exist
@@ -162,10 +157,20 @@ public class ChatService {
             requestBody.put("options", options);
             
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> responseEntity = restTemplate.postForEntity(apiUrl, requestEntity, Map.class);
+            ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(
+                apiUrl,
+                org.springframework.http.HttpMethod.POST,
+                requestEntity,
+                new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
+            );
             
             if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
-                return (String) responseEntity.getBody().get("response");
+                Map<String, Object> responseBody = responseEntity.getBody();
+                if (responseBody != null && responseBody.containsKey("response")) {
+                    return (String) responseBody.get("response");
+                } else {
+                    throw new RuntimeException("Invalid response format from Ollama API");
+                }
             } else {
                 throw new RuntimeException("Failed to get response from Ollama API: " + responseEntity.getStatusCode());
             }

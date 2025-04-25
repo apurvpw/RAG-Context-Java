@@ -4,7 +4,6 @@ import com.example.ragcontext.dto.EmbeddingRequest;
 import com.example.ragcontext.model.Context;
 import com.example.ragcontext.service.ContextService;
 import com.example.ragcontext.service.EmbeddingService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -12,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 
 @Slf4j
@@ -56,19 +54,4 @@ public class ContextController {
         return ResponseEntity.ok(context);
     }
     
-    // Simple test endpoint for file upload
-    @PostMapping(value = "/test-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> testFileUpload(
-            @RequestPart("file") MultipartFile file) {
-        
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File is empty");
-        }
-        
-        log.info("Received file: {}, size: {} bytes", 
-                file.getOriginalFilename(), 
-                file.getSize());
-                
-        return ResponseEntity.ok("File received successfully: " + file.getOriginalFilename());
-    }
 } 

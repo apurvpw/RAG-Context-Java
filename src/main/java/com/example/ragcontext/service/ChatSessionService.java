@@ -6,7 +6,6 @@ import com.example.ragcontext.dto.ChatSessionRequest;
 import com.example.ragcontext.dto.SessionHistoryDto;
 import com.example.ragcontext.model.ChatMessage;
 import com.example.ragcontext.model.ChatSession;
-import com.example.ragcontext.model.Context;
 import com.example.ragcontext.repository.ChatMessageRepository;
 import com.example.ragcontext.repository.ChatSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ public class ChatSessionService {
 
     public ChatSession createChatSession(ChatSessionRequest request) {
         // Verify the context exists
-        Context context = contextService.getContextById(request.getContextId());
+        contextService.getContextById(request.getContextId());
         
         ChatSession chatSession = ChatSession.builder()
                 .contextId(request.getContextId())
