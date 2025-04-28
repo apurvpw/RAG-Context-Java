@@ -3,21 +3,18 @@ package com.example.ragcontext.service;
 import com.example.ragcontext.dto.ChatRequest;
 import com.example.ragcontext.dto.ChatResponse;
 import com.example.ragcontext.model.Context;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,8 +26,7 @@ public class ChatService {
     private final ContextService contextService;
     private final EmbeddingService embeddingService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final RestTemplate restTemplate;
-    private final com.example.ragcontext.config.AppProperties appProperties;
+    private final OllamaChatModel ollamaChatModel;
     
     private static final int MAX_RELEVANT_MATCHES = 30;
 
@@ -47,8 +43,6 @@ public class ChatService {
         
         if (contextId == null || contextId.isEmpty()) {
             try {
-                // For simplicity, we're creating a new context with an empty description
-                // In a real application, you might want to search for existing contexts by name first
                 Context context = contextService.createContext(contextName, "Created during chat");
                 contextId = context.getId();
                 log.info("Created new context with ID: {} for chat session", contextId);
@@ -75,16 +69,26 @@ public class ChatService {
             // Build a context string from relevant matches
             String context = buildContext(relevantMatches);
             
-            // Create prompt with context
-            String prompt = String.format(
+            // Create system message with context
+            SystemMessage systemMessage = SystemMessage.from(
                     "You are an AI assistant that answers questions based on the provided context.\n\n" +
-                    "Context information:\n%s\n\n" +
-                    "User question: %s\n\n" +
-                    "Answer the question based only on the provided context. If the context doesn't contain the information needed, say 'I don't have enough information to answer this question.'",
-                    context, request.getQuestion());
+                    "Context information:\n" + context + "\n\n" +
+                    "Answer the question based only on the provided context. If the context doesn't contain the information needed, say 'I don't have enough information to answer this question.'"
+            );
             
-            // Stream the response to the user
-            streamChatResponse(prompt, request.getSessionId());
+            // Create user message
+            UserMessage userMessage = UserMessage.from(request.getQuestion());
+            
+            // Get response from Ollama
+            AiMessage aiMessage = ollamaChatModel.generate(systemMessage, userMessage).content();
+            String responseText = aiMessage.text();
+            
+            // Save the AI response to MongoDB
+            chatSessionService.saveAiMessage(request.getSessionId(), responseText);
+            
+            // Stream the response
+            streamResponse(responseText, request.getSessionId());
+            
         } catch (Exception e) {
             log.error("Error processing chat request", e);
             sendErrorResponse(request.getSessionId(), "Error processing your request: " + e.getMessage());
@@ -111,76 +115,9 @@ public class ChatService {
                 .collect(Collectors.joining("\n\n"));
     }
     
-    private void streamChatResponse(String prompt, String sessionId) {
-        // Create destination for this session
+    private void streamResponse(String responseText, String sessionId) {
         String destination = "/topic/chat/" + sessionId;
         
-        try {
-            // First get the complete response
-            String responseText = getResponseFromOllama(prompt);
-            
-            // Save the full AI response to MongoDB
-            chatSessionService.saveAiMessage(sessionId, responseText);
-            
-            // Then simulate streaming by breaking it into words
-            simulateStreaming(responseText, sessionId, destination);
-        } catch (Exception e) {
-            log.error("Error in chat streaming", e);
-            ChatResponse errorResponse = ChatResponse.builder()
-                    .sessionId(sessionId)
-                    .message("Error processing your request: " + e.getMessage())
-                    .done(true)
-                    .build();
-            
-            messagingTemplate.convertAndSend(destination, errorResponse);
-            
-            // Save error message as AI response
-            chatSessionService.saveAiMessage(sessionId, "Error: " + e.getMessage());
-        }
-    }
-    
-    private String getResponseFromOllama(String prompt) {
-        try {
-            String apiUrl = appProperties.getOllama().getUrl() + "/api/generate";
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", appProperties.getOllama().getChatModel());
-            requestBody.put("prompt", prompt);
-            requestBody.put("stream", false);
-            
-            // Add options for better response quality
-            Map<String, Object> options = new HashMap<>();
-            options.put("temperature", 0.7);
-            requestBody.put("options", options);
-            
-            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(
-                apiUrl,
-                org.springframework.http.HttpMethod.POST,
-                requestEntity,
-                new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
-            );
-            
-            if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
-                Map<String, Object> responseBody = responseEntity.getBody();
-                if (responseBody != null && responseBody.containsKey("response")) {
-                    return (String) responseBody.get("response");
-                } else {
-                    throw new RuntimeException("Invalid response format from Ollama API");
-                }
-            } else {
-                throw new RuntimeException("Failed to get response from Ollama API: " + responseEntity.getStatusCode());
-            }
-        } catch (Exception e) {
-            log.error("Error getting response from Ollama", e);
-            throw new RuntimeException("Error communicating with Ollama API", e);
-        }
-    }
-    
-    private void simulateStreaming(String responseText, String sessionId, String destination) {
         try {
             // Split the response into words and stream them one by one
             String[] words = responseText.split("\\s+");
@@ -211,7 +148,7 @@ public class ChatService {
             messagingTemplate.convertAndSend(destination, completionResponse);
             log.info("Completed streaming response for session: {}", sessionId);
         } catch (Exception e) {
-            log.error("Error simulating streaming", e);
+            log.error("Error streaming response", e);
             throw e;
         }
     }
