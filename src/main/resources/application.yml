@@ -22,7 +22,7 @@ app:
   ollama:
     url: http://localhost:11434
     chat-model: llama3.2
-    embedding-model: llama3.2
+    embedding-model: tazarov/all-minilm-l6-v2-f32
   embedding:
     dimensions: 384  # Embedding dimensions based on the model used
   document:
